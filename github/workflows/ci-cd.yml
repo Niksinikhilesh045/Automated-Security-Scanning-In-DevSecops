@@ -1,40 +1,100 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline with Security Scanning
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Check out code
         uses: actions/checkout@v2
-      - name: Set up Node.js (for frontend)
+
+      # Setup for the frontend (Node.js example)
+      - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
           node-version: '14'
-      - name: Install frontend dependencies
+
+      - name: Install dependencies
         run: npm install
+
+      # Set up backend (Python example)
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      - name: Install backend dependencies
+        run: |
+          pip install -r requirements.txt
+
+      # Build Docker image (if applicable)
+      - name: Build Docker image
+        run: docker build -t myapp .
+
+      # Static Application Security Testing (SAST) - CodeQL example
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
         with:
           languages: 'javascript, python'
+
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
+
+      # Dependency scanning with Snyk
       - name: Run Snyk to check dependencies
         uses: snyk/actions/node@v1
         with:
           args: test
-      - name: Docker Build
-        run: docker build -t myapp .
-      - name: Scan Docker Image with Trivy
+
+      # Container security scan with Trivy
+      - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: myapp
+
+      # Dynamic Application Security Testing (DAST) - OWASP ZAP example
       - name: Run OWASP ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.3.0
         with:
           target: 'http://localhost:8000'
+
+      # Upload CodeQL Reports as Artifacts
+      - name: Upload CodeQL report
+        uses: actions/upload-artifact@v2
+        with:
+          name: codeql-report
+          path: codeql-results/
+
+      # Upload Snyk reports as Artifacts
+      - name: Upload Snyk report
+        uses: actions/upload-artifact@v2
+        with:
+          name: snyk-report
+          path: snyk-report.json
+
+  # Slack Notification Step
+  notify:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack on Failure
+        if: failure()  # Sends the alert only if any previous step fails
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          text: |
+            🚨 Security scan failed in the CI/CD pipeline! 🚨
+            Please check the attached reports for more details.
+            - CodeQL Report: [Link to CodeQL report]
+            - Snyk Report: [Link to Snyk report]
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
