@@ -91,4 +91,4 @@ jobs:
             🚨 Security scan failed in the CI/CD pipeline! 🚨
             Please check the attached reports for more details.
         env:
-          SLACK_WEBHOOK_URL: ${{ https://hooks.slack.com/services/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 }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SECRET_WEBHOOK_URL }}
