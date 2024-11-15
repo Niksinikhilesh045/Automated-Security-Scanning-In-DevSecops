@@ -1,4 +1,4 @@
-name: CI/CD Pipeline with Security Scanning
+name: CI/CD Pipeline with Enhanced Security Scanning
 
 on:
   push:
@@ -9,92 +9,86 @@ on:
       - main
 
 jobs:
-  build:
+  security_scan:
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out code
         uses: actions/checkout@v2
 
-      # Setup for the frontend (Node.js example)
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '14'
-
-      - name: Install dependencies
+      # Frontend Security Scanning
+      - name: Install Frontend dependencies
         run: npm install
 
-      # Set up backend (Python example)
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.9'
-
-      - name: Install backend dependencies
-        run: |
-          pip install -r requirements.txt
-
-      # Build Docker image (if applicable)
-      - name: Build Docker image
-        run: docker build -t myapp .
-
-      # Static Application Security Testing (SAST) - CodeQL example
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
-        with:
-          languages: 'javascript, python'
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
-
-      # Dependency scanning with Snyk
-      - name: Run Snyk to check dependencies
+      - name: Run Snyk to check frontend dependencies
         uses: snyk/actions/node@v1
         with:
           args: test
 
-      # Container security scan with Trivy
+      # Backend Security Scanning
+      - name: Install Backend dependencies
+        run: pip install -r requirements.txt
+
+      - name: Python Dependency Analysis with Safety
+        run: safety check -r requirements.txt
+
+      - name: Static Code Analysis with Bandit
+        run: bandit -r .
+
+      # Build and Scan Backend Docker Image
+      - name: Build Docker image for Petstore backend
+        run: docker build -t petstore-backend .
+
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: myapp
+          image-ref: petstore-backend
 
-      # Dynamic Application Security Testing (DAST) - OWASP ZAP example
-      - name: Run OWASP ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.3.0
+      # OWASP ZAP Scan
+      - name: Start Petstore Backend
+        run: docker run -d -p 8080:8080 petstore-backend
+
+      - name: Run OWASP ZAP Active Scan
+        uses: zaproxy/action-full-scan@v0.3.0
         with:
-          target: 'http://localhost:8000'
+          target: 'http://localhost:8080'
 
-      # Upload CodeQL Reports as Artifacts
-      - name: Upload CodeQL report
+      # Secrets Scanning
+      - name: Run Gitleaks Secret Scan
+        uses: zricethezav/gitleaks-action@v1.1.3
+        with:
+          args: --path=. --report=gitleaks-report.json
+
+      # Upload Scan Reports as Artifacts
+      - name: Upload Bandit report
         uses: actions/upload-artifact@v2
         with:
-          name: codeql-report
-          path: codeql-results/
+          name: bandit-report
+          path: bandit-report.json
 
-      # Upload Snyk reports as Artifacts
-      - name: Upload Snyk report
+      - name: Upload Safety report
         uses: actions/upload-artifact@v2
         with:
-          name: snyk-report
-          path: snyk-report.json
+          name: safety-report
+          path: safety-report.json
 
-  # Slack Notification Step
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@v2
+        with:
+          name: trivy-report
+          path: trivy-report.json
+
   notify:
-    needs: build
+    needs: security_scan
     runs-on: ubuntu-latest
     steps:
       - name: Notify Slack on Failure
-        if: failure()  # Sends the alert only if any previous step fails
+        if: failure()
         uses: slackapi/slack-github-action@v1.23.0
         with:
-          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          channel-id: ${{ C081RFYNM96 }}
           text: |
             🚨 Security scan failed in the CI/CD pipeline! 🚨
             Please check the attached reports for more details.
-            - CodeQL Report: [Link to CodeQL report]
-            - Snyk Report: [Link to Snyk report]
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
+          SLACK_WEBHOOK_URL: ${{ https://hooks.slack.com/services/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 }}
